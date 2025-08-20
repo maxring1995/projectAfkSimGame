@@ -1,0 +1,2 @@
+# projectAfkSimGame
+idle game
