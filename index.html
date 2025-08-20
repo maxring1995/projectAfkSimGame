@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AFK Skill Game</title>
+<style>
+  body{font-family:sans-serif;margin:0;display:flex;flex-direction:column;height:100vh;}
+  #tabs{display:flex;background:#333;color:#fff;}
+  #tabs button{flex:1;padding:10px;border:none;background:#333;color:#fff;cursor:pointer;}
+  #tabs button.active{background:#555;}
+  #content{flex:1;overflow:auto;padding:10px;}
+  .tab{display:none;}
+  .tab.active{display:block;}
+  #action{padding:10px;border-top:1px solid #ccc;}
+  #log{height:100px;overflow:auto;border-top:1px solid #ccc;padding:5px;font-size:0.9em;background:#f9f9f9;}
+  @media (max-width:600px){#tabs button{font-size:12px;padding:8px;}}
+</style>
+</head>
+<body>
+<div id="tabs">
+  <button data-tab="skills" class="active">Skills</button>
+  <button data-tab="combat">Combat</button>
+  <button data-tab="quests">Quests</button>
+  <button data-tab="inventory">Inventory</button>
+</div>
+<div id="content">
+  <section id="skills" class="tab active"></section>
+  <section id="combat" class="tab"></section>
+  <section id="quests" class="tab"></section>
+  <section id="inventory" class="tab"></section>
+</div>
+<div id="action">
+  <span id="currentAction">Idle</span>
+  <button id="cancelAction" style="display:none;">Cancel</button>
+</div>
+<div id="log"></div>
+<script>
+const defaultData={
+  skills:{
+    woodcutting:{level:1,xp:0},
+    mining:{level:1,xp:0},
+    combat:{level:1,xp:0}
+  },
+  inventory:{gold:0,log:0,ore:0},
+  kills:{goblin:0,troll:0},
+  quests:{
+    gatherer:{status:"not_started"},
+    firstblood:{status:"not_started"}
+  },
+  activeAction:null
+};
+
+const skillActions={
+  woodcutting:{time:5000,xp:10,item:'log'},
+  mining:{time:7000,xp:15,item:'ore'}
+};
+
+const monsters={
+  goblin:{hp:10,time:8000,xp:20,loot:{gold:5}},
+  troll:{hp:20,time:12000,xp:40,loot:{gold:10,ore:1}}
+};
+
+const questDefs={
+  gatherer:{name:'Gatherer',description:'Collect 10 logs.',check:g=>g.inventory.log>=10,reward:g=>{g.inventory.gold+=20;}},
+  firstblood:{name:'First Blood',description:'Defeat 3 goblins.',check:g=>g.kills.goblin>=3,reward:g=>{g.inventory.gold+=15;}}
+};
+
+let game=loadGame();
+
+function loadGame(){
+  let save=localStorage.getItem('afkGameSave');
+  if(save){
+    try{return JSON.parse(save);}catch(e){}}
+  return JSON.parse(JSON.stringify(defaultData));
+}
+function saveGame(){
+  localStorage.setItem('afkGameSave',JSON.stringify(game));
+}
+
+function xpForLevel(level){return level*level*50;}
+function addXP(skill,amount){
+  const s=game.skills[skill];
+  s.xp+=amount;
+  while(s.xp>=xpForLevel(s.level+1)) s.level++;
+}
+
+function startAction(type,name,duration){
+  if(game.activeAction) return;
+  game.activeAction={type,name,end:Date.now()+duration};
+  updateActionUI();
+  saveGame();
+}
+function cancelAction(){
+  game.activeAction=null;
+  updateActionUI();
+  saveGame();
+}
+
+document.getElementById('cancelAction').onclick=cancelAction;
+
+function resolveAction(){
+  const act=game.activeAction;
+  if(!act) return;
+  if(act.type==='skill'){
+    const info=skillActions[act.name];
+    addXP(act.name,info.xp);
+    game.inventory[info.item]=(game.inventory[info.item]||0)+1;
+    logMessage(`${capitalize(act.name)} complete!`);
+  }else if(act.type==='combat'){
+    const mon=monsters[act.name];
+    addXP('combat',mon.xp);
+    for(let item in mon.loot){
+      game.inventory[item]=(game.inventory[item]||0)+mon.loot[item];
+    }
+    game.kills[act.name]=(game.kills[act.name]||0)+1;
+    logMessage(`Defeated ${capitalize(act.name)}!`);
+  }
+  game.activeAction=null;
+  checkQuests();
+  saveGame();
+  updateUI();
+}
+
+function tick(){
+  if(game.activeAction && Date.now()>=game.activeAction.end){
+    resolveAction();
+  }
+  updateActionUI();
+  saveGame();
+}
+setInterval(tick,1000);
+
+function renderSkills(){
+  const cont=document.getElementById('skills');
+  cont.innerHTML='';
+  for(let name in game.skills){
+    const s=game.skills[name];
+    const div=document.createElement('div');
+    div.textContent=`${capitalize(name)} Lv.${s.level} (${s.xp} xp)`;
+    if(skillActions[name]){
+      const btn=document.createElement('button');
+      btn.textContent='Train';
+      btn.onclick=()=>startAction('skill',name,skillActions[name].time);
+      if(game.activeAction) btn.disabled=true;
+      div.appendChild(btn);
+    }
+    cont.appendChild(div);
+  }
+}
+
+function renderCombat(){
+  const cont=document.getElementById('combat');
+  cont.innerHTML='';
+  for(let name in monsters){
+    const m=monsters[name];
+    const div=document.createElement('div');
+    div.textContent=`${capitalize(name)} (HP:${m.hp})`;
+    const btn=document.createElement('button');
+    btn.textContent='Fight';
+    btn.onclick=()=>startAction('combat',name,m.time);
+    if(game.activeAction) btn.disabled=true;
+    div.appendChild(btn);
+    cont.appendChild(div);
+  }
+}
+
+function renderInventory(){
+  const cont=document.getElementById('inventory');
+  cont.innerHTML='';
+  const items=Object.keys(game.inventory).filter(k=>game.inventory[k]>0);
+  if(items.length===0){cont.textContent='Empty';return;}
+  items.forEach(item=>{
+    const div=document.createElement('div');
+    div.textContent=`${capitalize(item)}: ${game.inventory[item]}`;
+    cont.appendChild(div);
+  });
+}
+
+function renderQuests(){
+  const cont=document.getElementById('quests');
+  cont.innerHTML='';
+  for(let id in questDefs){
+    const q=questDefs[id];
+    const status=game.quests[id].status;
+    const div=document.createElement('div');
+    div.innerHTML=`<strong>${q.name}</strong> - ${q.description} [${status}]`;
+    if(status==='not_started'){
+      const btn=document.createElement('button');
+      btn.textContent='Start';
+      btn.onclick=()=>{game.quests[id].status='started';saveGame();renderQuests();};
+      div.appendChild(btn);
+    }
+    cont.appendChild(div);
+  }
+}
+
+function checkQuests(){
+  for(let id in questDefs){
+    const q=questDefs[id];
+    const status=game.quests[id].status;
+    if(status==='started' && q.check(game)){
+      q.reward(game);
+      game.quests[id].status='completed';
+      logMessage(`Quest completed: ${q.name}`);
+    }
+  }
+}
+
+function updateActionUI(){
+  const current=document.getElementById('currentAction');
+  const cancel=document.getElementById('cancelAction');
+  if(game.activeAction){
+    const t=Math.max(0,Math.ceil((game.activeAction.end-Date.now())/1000));
+    if(game.activeAction.type==='skill'){
+      current.textContent=`${capitalize(game.activeAction.name)} - ${t}s`;
+    }else{
+      current.textContent=`Fighting ${capitalize(game.activeAction.name)} - ${t}s`;
+    }
+    cancel.style.display='inline';
+  }else{
+    current.textContent='Idle';
+    cancel.style.display='none';
+  }
+}
+
+function capitalize(str){return str.charAt(0).toUpperCase()+str.slice(1);}
+
+function logMessage(msg){
+  const log=document.getElementById('log');
+  const div=document.createElement('div');
+  div.textContent=msg;
+  log.prepend(div);
+}
+
+function updateUI(){
+  renderSkills();
+  renderCombat();
+  renderInventory();
+  renderQuests();
+  updateActionUI();
+}
+
+// Tab handling
+ document.querySelectorAll('#tabs button').forEach(btn=>{
+  btn.addEventListener('click',()=>{
+    document.querySelectorAll('#tabs button').forEach(b=>b.classList.remove('active'));
+    document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+    btn.classList.add('active');
+    document.getElementById(btn.dataset.tab).classList.add('active');
+  });
+});
+
+updateUI();
+checkQuests();
+</script>
+</body>
+</html>
