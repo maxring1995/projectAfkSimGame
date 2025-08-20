@@ -4,17 +4,98 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>AFK Skill Game</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet">
 <style>
-  body{font-family:sans-serif;margin:0;display:flex;flex-direction:column;height:100vh;}
-  #tabs{display:flex;background:#333;color:#fff;}
-  #tabs button{flex:1;padding:10px;border:none;background:#333;color:#fff;cursor:pointer;}
-  #tabs button.active{background:#555;}
-  #content{flex:1;overflow:auto;padding:10px;}
+  :root{
+    --primary:#4a90e2;
+    --primary-dark:#357abd;
+    --bg:#f4f7fa;
+    --card-bg:#fff;
+    --text:#333;
+  }
+  body{
+    font-family:'Inter',sans-serif;
+    margin:0;
+    display:flex;
+    flex-direction:column;
+    height:100vh;
+    background:var(--bg);
+    color:var(--text);
+  }
+  #tabs{
+    display:flex;
+    background:var(--primary);
+    box-shadow:0 2px 4px rgba(0,0,0,0.1);
+  }
+  #tabs button{
+    flex:1;
+    padding:12px;
+    background:transparent;
+    color:#fff;
+    border:none;
+    cursor:pointer;
+    transition:background .3s;
+  }
+  #tabs button:hover{
+    background:var(--primary-dark);
+  }
+  #tabs button.active{
+    background:var(--primary-dark);
+  }
+  #content{
+    flex:1;
+    overflow:auto;
+    padding:1rem;
+  }
   .tab{display:none;}
   .tab.active{display:block;}
-  #action{padding:10px;border-top:1px solid #ccc;}
-  #log{height:100px;overflow:auto;border-top:1px solid #ccc;padding:5px;font-size:0.9em;background:#f9f9f9;}
-  @media (max-width:600px){#tabs button{font-size:12px;padding:8px;}}
+  .card{
+    background:var(--card-bg);
+    border-radius:8px;
+    box-shadow:0 1px 3px rgba(0,0,0,0.1);
+    padding:0.75rem 1rem;
+    margin-bottom:0.75rem;
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+  }
+  button{
+    background:var(--primary);
+    color:#fff;
+    border:none;
+    padding:0.4rem 0.8rem;
+    border-radius:4px;
+    cursor:pointer;
+    transition:background .3s;
+  }
+  button:hover:not(:disabled){
+    background:var(--primary-dark);
+  }
+  button:disabled{
+    opacity:.5;
+    cursor:not-allowed;
+  }
+  #action{
+    padding:0.75rem 1rem;
+    border-top:1px solid #ddd;
+    background:#fff;
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+  }
+  #log{
+    height:120px;
+    overflow:auto;
+    border-top:1px solid #ddd;
+    padding:0.5rem 1rem;
+    font-size:0.9em;
+    background:#fff;
+  }
+  @media (max-width:600px){
+    #tabs button{font-size:.85rem;padding:10px 8px;}
+  }
 </style>
 </head>
 <body>
@@ -137,6 +218,7 @@ function renderSkills(){
   for(let name in game.skills){
     const s=game.skills[name];
     const div=document.createElement('div');
+    div.className='card';
     div.textContent=`${capitalize(name)} Lv.${s.level} (${s.xp} xp)`;
     if(skillActions[name]){
       const btn=document.createElement('button');
@@ -155,6 +237,7 @@ function renderCombat(){
   for(let name in monsters){
     const m=monsters[name];
     const div=document.createElement('div');
+    div.className='card';
     div.textContent=`${capitalize(name)} (HP:${m.hp})`;
     const btn=document.createElement('button');
     btn.textContent='Fight';
@@ -172,6 +255,7 @@ function renderInventory(){
   if(items.length===0){cont.textContent='Empty';return;}
   items.forEach(item=>{
     const div=document.createElement('div');
+    div.className='card';
     div.textContent=`${capitalize(item)}: ${game.inventory[item]}`;
     cont.appendChild(div);
   });
@@ -184,6 +268,7 @@ function renderQuests(){
     const q=questDefs[id];
     const status=game.quests[id].status;
     const div=document.createElement('div');
+    div.className='card';
     div.innerHTML=`<strong>${q.name}</strong> - ${q.description} [${status}]`;
     if(status==='not_started'){
       const btn=document.createElement('button');
